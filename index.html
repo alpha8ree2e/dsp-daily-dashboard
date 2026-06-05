@@ -1,0 +1,1426 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>DSP Daily Dashboard</title>
+
+<!-- Excel parser -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<style>
+:root{
+  --black:#000;
+  --ink:#1d1d1f;
+  --muted:rgba(0,0,0,.48);
+  --surface:#f5f5f7;
+  --white:#fff;
+  --blue:#0071e3;
+  --blue-hover:#0077ed;
+  --danger:#d70015;
+  --line:rgba(0,0,0,.08);
+}
+
+*{box-sizing:border-box}
+
+html{background:var(--surface)}
+
+body{
+  margin:0;
+  background:var(--surface);
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Helvetica Neue",Arial,sans-serif;
+  color:var(--ink);
+  letter-spacing:-.22px;
+  -webkit-font-smoothing:antialiased;
+}
+
+button,input{
+  font:inherit;
+}
+
+button:focus-visible,input:focus-visible,.drop:focus-visible{
+  outline:2px solid var(--blue);
+  outline-offset:3px;
+}
+
+.globalNav{
+  position:fixed;
+  z-index:20;
+  inset:0 0 auto;
+  height:48px;
+  background:rgba(0,0,0,.8);
+  color:rgba(255,255,255,.82);
+  backdrop-filter:saturate(180%) blur(20px);
+  -webkit-backdrop-filter:saturate(180%) blur(20px);
+}
+
+.navInner{
+  width:min(980px,calc(100% - 40px));
+  height:100%;
+  margin:auto;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  font-size:12px;
+}
+
+.brand{
+  display:flex;
+  align-items:center;
+  gap:8px;
+  color:#fff;
+  font-weight:600;
+}
+
+.brandMark{
+  width:17px;
+  height:17px;
+  display:grid;
+  place-items:center;
+  border-radius:5px;
+  background:#fff;
+  color:#000;
+  font-size:10px;
+  letter-spacing:-1px;
+}
+
+.navMeta{color:rgba(255,255,255,.56)}
+
+#upload{
+  min-height:100vh;
+  padding:48px 24px 0;
+  display:grid;
+  grid-template-rows:1fr auto;
+  background:var(--black);
+  color:#f5f5f7;
+}
+
+.uploadStage{
+  width:min(980px,100%);
+  margin:auto;
+  padding:96px 0 64px;
+  display:grid;
+  grid-template-columns:minmax(0,1.15fr) minmax(340px,.85fr);
+  gap:72px;
+  align-items:center;
+}
+
+.eyebrow{
+  margin:0 0 16px;
+  color:#86868b;
+  font-size:17px;
+  font-weight:600;
+  letter-spacing:-.37px;
+}
+
+.uploadCopy h1{
+  max-width:620px;
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  font-size:clamp(48px,7vw,80px);
+  line-height:.98;
+  letter-spacing:-3.4px;
+  font-weight:600;
+}
+
+.uploadCopy .lead{
+  max-width:520px;
+  margin:26px 0 0;
+  color:#a1a1a6;
+  font-size:19px;
+  line-height:1.47;
+  letter-spacing:-.37px;
+}
+
+.privacyNote{
+  margin-top:30px;
+  display:flex;
+  align-items:center;
+  gap:9px;
+  color:#86868b;
+  font-size:12px;
+}
+
+.drop{
+  min-height:390px;
+  padding:42px;
+  display:flex;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  border:1px solid rgba(255,255,255,.15);
+  border-radius:12px;
+  text-align:center;
+  background:#1d1d1f;
+  transition:transform .25s ease,background .25s ease,border-color .25s ease;
+  cursor:pointer;
+}
+
+.drop.dragging{
+  transform:scale(1.015);
+  border-color:var(--blue);
+  background:#272729;
+}
+
+.uploadIcon{
+  width:74px;
+  height:74px;
+  margin-bottom:30px;
+  display:grid;
+  place-items:center;
+  border-radius:50%;
+  background:#2a2a2d;
+  color:#f5f5f7;
+}
+
+.uploadIcon svg{width:34px;height:34px}
+
+.drop h2{
+  margin:0;
+  font-size:28px;
+  line-height:1.14;
+  letter-spacing:.2px;
+  font-weight:600;
+}
+
+.uploadBtn{
+  margin-top:26px;
+  padding:11px 21px;
+  border:0;
+  border-radius:980px;
+  background:var(--blue);
+  color:#fff;
+  font-size:17px;
+  cursor:pointer;
+  transition:background .2s,transform .2s;
+}
+
+.pasteBtn{
+  margin-top:10px;
+  padding:10px 18px;
+  border:1px solid #2997ff;
+  border-radius:980px;
+  background:transparent;
+  color:#2997ff;
+  font-size:14px;
+  cursor:pointer;
+  transition:background .2s,transform .2s;
+}
+
+.pasteBtn:hover{
+  background:rgba(41,151,255,.12);
+}
+
+.uploadBtn:hover,.viewBtn:hover,.export:hover{
+  background:var(--blue-hover);
+}
+
+.uploadBtn:active,.pasteBtn:active,.viewBtn:active,.export:active,.secondary:active{
+  transform:scale(.97);
+}
+
+.uploadHint{
+  color:#86868b;
+  margin:14px 0 0;
+  font-size:14px;
+}
+
+.error{
+  display:none;
+  max-width:500px;
+  margin:16px auto 0;
+  color:#ff6961;
+  line-height:1.5;
+  font-size:14px;
+}
+
+.uploadStatus{
+  width:100%;
+  display:none;
+  margin-top:24px;
+}
+
+.statusTrack{
+  height:4px;
+  overflow:hidden;
+  border-radius:980px;
+  background:#2a2a2d;
+}
+
+.statusBar{
+  width:0%;
+  height:100%;
+  border-radius:inherit;
+  background:var(--blue);
+  transition:width .35s ease;
+}
+
+.statusText{
+  margin:12px 0 0;
+  color:#a1a1a6;
+  font-size:14px;
+}
+
+.readyPanel{
+  display:none;
+  width:100%;
+  margin-top:24px;
+  padding:18px;
+  border-radius:12px;
+  background:#272729;
+  text-align:left;
+}
+
+.readyTitle{
+  margin:0;
+  color:#f5f5f7;
+  font-size:17px;
+  font-weight:600;
+}
+
+.readyMeta{
+  margin:8px 0 0;
+  color:#a1a1a6;
+  font-size:14px;
+  line-height:1.35;
+}
+
+.viewBtn{
+  width:100%;
+  margin-top:16px;
+  padding:12px 18px;
+  border:0;
+  border-radius:980px;
+  background:var(--blue);
+  color:#fff;
+  font-size:15px;
+  cursor:pointer;
+  transition:background .2s,transform .2s;
+}
+
+.uploadFooter{
+  padding:20px 0 24px;
+  text-align:center;
+  color:#6e6e73;
+  font-size:12px;
+}
+
+/* dashboard */
+
+#dashboard{
+  display:none;
+  min-height:100vh;
+  padding-top:48px;
+}
+
+.dashboardHero{
+  background:#000;
+  color:#f5f5f7;
+}
+
+.heroInner{
+  width:min(1180px,calc(100% - 48px));
+  margin:auto;
+  padding:74px 0 64px;
+}
+
+.heroTop{
+  display:flex;
+  align-items:flex-end;
+  justify-content:space-between;
+  gap:40px;
+}
+
+.heroTitle .eyebrow{color:#86868b}
+
+.heroTitle h1{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  font-size:clamp(44px,6vw,72px);
+  line-height:1.02;
+  letter-spacing:-3px;
+  font-weight:600;
+}
+
+.heroDescription{
+  max-width:330px;
+  margin:0 0 5px;
+  color:#a1a1a6;
+  font-size:17px;
+  line-height:1.47;
+}
+
+.topbar{
+  width:min(1180px,calc(100% - 48px));
+  margin:0 auto;
+  padding:24px 0;
+  display:flex;
+  gap:12px;
+  align-items:center;
+  flex-wrap:wrap;
+}
+
+.searchWrap{
+  position:relative;
+  flex:1;
+  min-width:220px;
+}
+
+.searchIcon{
+  position:absolute;
+  left:14px;
+  top:50%;
+  width:16px;
+  height:16px;
+  transform:translateY(-50%);
+  color:var(--muted);
+  pointer-events:none;
+}
+
+.search{
+  width:100%;
+  height:44px;
+  padding:0 16px 0 40px;
+  border:3px solid rgba(0,0,0,.04);
+  border-radius:11px;
+  background:#fafafc;
+  color:var(--ink);
+  font-size:14px;
+}
+
+.export{
+  min-height:44px;
+  padding:0 18px;
+  border:0;
+  border-radius:980px;
+  background:var(--blue);
+  color:#fff;
+  font-size:14px;
+  cursor:pointer;
+  transition:background .2s,transform .2s;
+}
+
+.secondary{
+  min-height:44px;
+  padding:0 18px;
+  border:1px solid #0066cc;
+  border-radius:980px;
+  background:transparent;
+  color:#0066cc;
+  font-size:14px;
+  cursor:pointer;
+  transition:background .2s,transform .2s;
+}
+
+.secondary:hover{
+  background:rgba(0,113,227,.06);
+}
+
+.fileInfo{
+  width:100%;
+  color:var(--muted);
+  font-size:12px;
+}
+
+.summary{
+  width:min(1180px,calc(100% - 48px));
+  margin:-32px auto 0;
+  position:relative;
+  z-index:2;
+  display:grid;
+  grid-template-columns:repeat(4,minmax(150px,1fr));
+  gap:14px;
+}
+
+.metric{
+  min-height:150px;
+  padding:24px;
+  display:flex;
+  flex-direction:column;
+  justify-content:space-between;
+  border-radius:12px;
+  background:#fff;
+  box-shadow:rgba(0,0,0,.10) 3px 5px 30px 0;
+}
+
+.metricLabel{
+  color:var(--muted);
+  font-size:14px;
+  line-height:1.29;
+}
+
+.metricValue{
+  margin-top:18px;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  font-size:48px;
+  line-height:1;
+  letter-spacing:-2px;
+  font-weight:600;
+}
+
+.metric.danger .metricValue{
+  color:var(--danger);
+}
+
+.notice{
+  width:min(1180px,calc(100% - 48px));
+  display:none;
+  margin:24px auto 0;
+  padding:13px 16px;
+  border-radius:8px;
+  background:#fff;
+  color:rgba(0,0,0,.64);
+  font-size:14px;
+}
+
+.card{
+  width:min(1180px,calc(100% - 48px));
+  margin:0 auto 64px;
+  background:#fff;
+  border-radius:12px;
+  overflow:auto;
+}
+
+.tableHeading{
+  width:min(1180px,calc(100% - 48px));
+  margin:48px auto 18px;
+  display:flex;
+  align-items:end;
+  justify-content:space-between;
+  gap:20px;
+}
+
+.tableHeading h2{
+  margin:0;
+  font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Helvetica Neue",Arial,sans-serif;
+  font-size:32px;
+  line-height:1.1;
+  letter-spacing:-1px;
+  font-weight:600;
+}
+
+.tableHeading p{
+  margin:0 0 3px;
+  color:var(--muted);
+  font-size:12px;
+}
+
+table{
+  width:100%;
+  border-collapse:collapse;
+}
+
+thead th{
+  position:sticky;
+  top:0;
+  background:#fff;
+  padding:15px 18px;
+  text-align:center;
+  cursor:pointer;
+  border-bottom:1px solid var(--line);
+  color:var(--muted);
+  font-size:12px;
+  font-weight:600;
+}
+
+thead th:hover{
+  color:#0066cc;
+}
+
+thead th:last-child{
+  text-align:left;
+  padding-left:18px;
+  width:35%;
+}
+
+tbody td{
+  padding:18px;
+  border-bottom:1px solid var(--line);
+  text-align:center;
+  font-size:14px;
+}
+
+tbody tr:hover{
+  background:#f5f5f7;
+}
+
+.unreceived{
+  color:var(--danger);
+  font-weight:600;
+}
+
+/* tags */
+
+.tag{
+  padding:5px 10px;
+  border-radius:980px;
+  font-size:12px;
+  background:#f5f5f7;
+  color:#424245;
+}
+
+.commentCell{
+  display:flex;
+  justify-content:flex-start;
+  align-items:center;
+  gap:6px;
+  flex-wrap:wrap;
+  min-height:24px;
+}
+
+.missort,.shelf,.not,.hub{background:#f5f5f7;color:#424245}
+
+.copied{
+  color:var(--blue);
+}
+
+.check{
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  width:18px;
+  height:18px;
+  margin-left:6px;
+  border-radius:50%;
+  background:var(--blue);
+  color:white;
+  font-size:12px;
+  font-weight:700;
+  transform:scale(0.6);
+  opacity:0;
+}
+
+.check.animate{
+  animation:popCheck 0.35s ease forwards;
+}
+
+@keyframes popCheck{
+  0%{
+    transform:scale(0.6);
+    opacity:0;
+  }
+  60%{
+    transform:scale(1.2);
+    opacity:1;
+  }
+  100%{
+    transform:scale(1);
+    opacity:1;
+  }
+}
+
+@media(max-width:760px){
+  .navMeta{display:none}
+
+  #upload{
+    padding:48px 20px 0;
+  }
+
+  .uploadStage{
+    padding:64px 0 40px;
+    grid-template-columns:1fr;
+    gap:42px;
+  }
+
+  .uploadCopy h1{letter-spacing:-2px}
+
+  .drop{
+    width:100%;
+    min-height:330px;
+    padding:36px 20px;
+  }
+
+  .heroInner{
+    width:calc(100% - 32px);
+    padding:56px 0 68px;
+  }
+
+  .heroTop{
+    align-items:flex-start;
+    flex-direction:column;
+    gap:22px;
+  }
+
+  .heroTitle h1{letter-spacing:-2px}
+
+  .summary{
+    width:calc(100% - 32px);
+    margin-top:-26px;
+    gap:8px;
+    grid-template-columns:repeat(2,minmax(0,1fr));
+  }
+
+  .metric{
+    min-height:126px;
+    padding:18px;
+  }
+
+  .metricValue{
+    font-size:38px;
+  }
+
+  .topbar,.notice,.tableHeading,.card{
+    width:calc(100% - 32px);
+  }
+
+  .topbar{
+    padding:20px 0;
+  }
+
+  .searchWrap{
+    width:100%;
+    flex-basis:100%;
+  }
+
+  .tableHeading{
+    margin-top:36px;
+    align-items:flex-start;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  table{
+    min-width:780px;
+  }
+}
+</style>
+</head>
+
+<body>
+
+<nav class="globalNav">
+<div class="navInner">
+<div class="brand"><span class="brandMark">D</span><span>DSP Daily</span></div>
+<div class="navMeta">Local report workspace</div>
+</div>
+</nav>
+
+<!-- upload -->
+
+<div id="upload">
+
+<main class="uploadStage">
+
+<section class="uploadCopy">
+<p class="eyebrow">DSP Daily Dashboard</p>
+<h1>Turn today’s report into a clear next move.</h1>
+<p class="lead">Drop in the daily Excel report. Get a focused view of received shipments, exceptions, and the DSPs that need attention.</p>
+<div class="privacyNote">
+<span aria-hidden="true">●</span>
+<span>Your report stays in this browser.</span>
+</div>
+</section>
+
+<div class="drop" id="drop" tabindex="0" role="button" aria-label="Upload Excel or CSV report">
+
+<div class="uploadIcon" aria-hidden="true">
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+<path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4.5A1.5 1.5 0 0 0 6.5 20h11a1.5 1.5 0 0 0 1.5-1.5V14"/>
+</svg>
+</div>
+
+<h2>Upload today’s report.</h2>
+
+<button class="uploadBtn" id="selectFile" type="button">Select File</button>
+<button class="pasteBtn" id="pasteButton" type="button">Paste from Clipboard</button>
+
+<input type="file" id="file" accept=".xlsx,.xls,.csv" hidden>
+
+<p class="uploadHint">Select a file, drag it here, or copy cells from Excel and paste.</p>
+<p class="error" id="uploadError" role="alert"></p>
+
+<div class="uploadStatus" id="uploadStatus" aria-live="polite">
+<div class="statusTrack"><div class="statusBar" id="statusBar"></div></div>
+<p class="statusText" id="statusText">Preparing report...</p>
+</div>
+
+<div class="readyPanel" id="readyPanel">
+<p class="readyTitle">Report ready.</p>
+<p class="readyMeta" id="readyMeta"></p>
+<button class="viewBtn" id="viewDashboardButton" type="button">View Dashboard</button>
+</div>
+
+</div>
+
+</main>
+
+<footer class="uploadFooter">Built for a faster daily handoff.</footer>
+
+</div>
+
+<!-- dashboard -->
+
+<div id="dashboard">
+
+<header class="dashboardHero">
+<div class="heroInner">
+<div class="heroTop">
+<div class="heroTitle">
+<p class="eyebrow">Daily operations</p>
+<h1>Today, at a glance.</h1>
+</div>
+<p class="heroDescription">A focused view of pickup progress and shipment exceptions across every DSP.</p>
+</div>
+</div>
+</header>
+
+<div class="summary">
+<div class="metric"><div class="metricLabel">Total shipments</div><div class="metricValue" id="totalMetric">0</div></div>
+<div class="metric"><div class="metricLabel">Received</div><div class="metricValue" id="receivedMetric">0</div></div>
+<div class="metric danger"><div class="metricLabel">Unreceived</div><div class="metricValue" id="unreceivedMetric">0</div></div>
+<div class="metric danger"><div class="metricLabel">DSPs with issues</div><div class="metricValue" id="issueMetric">0</div></div>
+</div>
+
+<div class="topbar">
+
+<div class="searchWrap">
+<svg class="searchIcon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
+<circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/>
+</svg>
+<input class="search" placeholder="Search DSP" aria-label="Search DSP" id="search">
+</div>
+
+<button class="export" id="exportButton" type="button">Export Excel</button>
+<button class="secondary" id="resetButton" type="button">Upload Another</button>
+<span class="fileInfo" id="fileInfo"></span>
+
+</div>
+
+<div class="notice" id="notice"></div>
+
+<div class="tableHeading">
+<h2>DSP performance</h2>
+<p>Select any column heading to copy it.</p>
+</div>
+
+<div class="card">
+
+<table>
+
+<thead>
+<tr id="thead"></tr>
+</thead>
+
+<tbody id="tbody"></tbody>
+
+</table>
+
+</div>
+
+</div>
+
+<script>
+
+/* dsp order */
+
+const KNOWN_DSP=[
+"MIA-ABI",
+"MIA-DRT",
+"MIA-ECL",
+"MIA-GOD",
+"MIA-JET",
+"MIA-OEC",
+"MIA-PFC",
+"MIA-SDI",
+"MIA-SOX",
+"MIA-WME"
+]
+
+/* upload */
+
+const COLUMN_ALIASES={
+  delivery:"派送方",
+  waybillNo:"运单号",
+  latestStatus:"运单状态",
+  "运单最新状态":"运单状态",
+  "最新状态":"运单状态"
+}
+const REQUIRED_COLUMNS=["派送方","运单号","运单状态","领取状态"]
+const COLUMNS=["派送方","总数量","实领数量","未领数量","异常取件","Comment"]
+const TAG_CLASSES={
+  DSP错分:"missort",
+  上架:"shelf",
+  未拿到:"not",
+  HUB滞留:"hub"
+}
+
+const fileInput=document.getElementById("file")
+const dropZone=document.getElementById("drop")
+const selectFileButton=document.getElementById("selectFile")
+const pasteButton=document.getElementById("pasteButton")
+const uploadStatus=document.getElementById("uploadStatus")
+const statusBar=document.getElementById("statusBar")
+const statusText=document.getElementById("statusText")
+const readyPanel=document.getElementById("readyPanel")
+const readyMeta=document.getElementById("readyMeta")
+const viewDashboardButton=document.getElementById("viewDashboardButton")
+const uploadView=document.getElementById("upload")
+const dashboard=document.getElementById("dashboard")
+const uploadError=document.getElementById("uploadError")
+const searchInput=document.getElementById("search")
+const exportButton=document.getElementById("exportButton")
+const resetButton=document.getElementById("resetButton")
+const fileInfo=document.getElementById("fileInfo")
+const notice=document.getElementById("notice")
+const thead=document.getElementById("thead")
+const tbody=document.getElementById("tbody")
+
+selectFileButton.addEventListener("click",()=>fileInput.click())
+pasteButton.addEventListener("click",pasteFromClipboard)
+viewDashboardButton.addEventListener("click",showPreparedDashboard)
+dropZone.addEventListener("click",e=>{
+  if(e.target.closest("button")) return
+  fileInput.click()
+})
+dropZone.addEventListener("keydown",e=>{
+  if(e.key==="Enter" || e.key===" "){
+    e.preventDefault()
+    fileInput.click()
+  }
+})
+fileInput.addEventListener("change",e=>readFile(e.target.files[0]))
+document.addEventListener("paste",handlePaste)
+exportButton.addEventListener("click",exportExcel)
+resetButton.addEventListener("click",resetDashboard)
+
+dropZone.addEventListener("dragover",e=>{
+  e.preventDefault()
+  dropZone.classList.add("dragging")
+})
+
+dropZone.addEventListener("dragleave",()=>dropZone.classList.remove("dragging"))
+
+dropZone.addEventListener("drop",e=>{
+  e.preventDefault()
+  dropZone.classList.remove("dragging")
+  readDroppedItems(e.dataTransfer)
+})
+
+/* read excel */
+
+function readFile(f){
+  resetImportState()
+  if(!f) return
+
+  if(!isSupportedFile(f)){
+    showError("Please select an Excel or CSV file.")
+    return
+  }
+
+  let reader=new FileReader()
+
+  setImportProgress(12,"Reading file...")
+
+  reader.onload=evt=>{
+    try{
+      setImportProgress(42,"Parsing workbook...")
+      importArrayBuffer(evt.target.result,f.name)
+    }catch(error){
+      showError(error.message || "Unable to read this file.")
+    }
+  }
+
+  reader.onerror=()=>showError("Unable to read this file.")
+  reader.readAsArrayBuffer(f)
+}
+
+function importArrayBuffer(buffer,name){
+  let errors=[]
+  let attempts=[
+    ()=>XLSX.read(buffer,{type:"array",cellDates:true}),
+    ()=>XLSX.read(new Uint8Array(buffer),{type:"array",codepage:65001}),
+    ()=>XLSX.read(decodeReportText(buffer),{type:"string"})
+  ]
+
+  for(let attempt of attempts){
+    try{
+      importWorkbook(attempt(),name)
+      return
+    }catch(error){
+      errors.push(error.message)
+    }
+  }
+
+  let reason=[...new Set(errors.filter(Boolean))].join(" / ")
+  throw new Error(`Unable to parse the original DMS export. ${reason}`)
+}
+
+function decodeReportText(buffer){
+  let bytes=new Uint8Array(buffer)
+  let encodings=["utf-8","utf-16le"]
+
+  for(let encoding of encodings){
+    try{
+      let text=new TextDecoder(encoding,{fatal:true}).decode(bytes)
+      if(text.includes("\t") || text.includes(",") || /<table/i.test(text)) return text
+    }catch{}
+  }
+
+  return new TextDecoder("utf-8").decode(bytes)
+}
+
+function readDroppedItems(dataTransfer){
+  resetImportState()
+  let files=[...dataTransfer.files]
+
+  if(!files.length && dataTransfer.items){
+    files=[...dataTransfer.items]
+      .filter(item=>item.kind==="file")
+      .map(item=>item.getAsFile())
+      .filter(Boolean)
+  }
+
+  let reportFile=files.find(isSupportedFile)
+  if(reportFile){
+    readFile(reportFile)
+    return
+  }
+
+  let text=dataTransfer.getData("text/plain")
+  if(text.trim()){
+    try{
+      importClipboardText(text)
+    }catch(error){
+      showError(error.message || "Unable to read the dropped report.")
+    }
+    return
+  }
+
+  showError("No Excel or CSV data was found. Drag the attachment itself, not its preview.")
+}
+
+function isSupportedFile(file){
+  let supportedName=/\.(xlsx|xls|csv)$/i.test(file.name || "")
+  let supportedType=[
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "application/vnd.ms-excel",
+    "text/csv",
+    "application/csv"
+  ].includes(file.type)
+  return supportedName || supportedType
+}
+
+async function pasteFromClipboard(){
+  resetImportState()
+
+  try{
+    if(navigator.clipboard?.read){
+      let items=await navigator.clipboard.read()
+      for(let item of items){
+        let fileType=item.types.find(type=>
+          type.includes("spreadsheet") || type==="text/csv" || type==="application/octet-stream"
+        )
+        if(fileType){
+          let blob=await item.getType(fileType)
+          readFile(new File([blob],"Clipboard Report.xlsx",{type:fileType}))
+          return
+        }
+      }
+    }
+
+    if(navigator.clipboard?.readText){
+      let text=await navigator.clipboard.readText()
+      importClipboardText(text)
+      return
+    }
+
+    throw new Error("Use Ctrl+V or Command+V to paste copied Excel cells.")
+  }catch(error){
+    showError(error.message || "Clipboard access was blocked. Use Ctrl+V or Command+V instead.")
+  }
+}
+
+function handlePaste(event){
+  if(dashboard.style.display==="block") return
+
+  let files=[...event.clipboardData.files]
+  if(files.length){
+    event.preventDefault()
+    readFile(files[0])
+    return
+  }
+
+  let text=event.clipboardData.getData("text/plain")
+  if(text.trim()){
+    event.preventDefault()
+    resetImportState()
+    try{
+      importClipboardText(text)
+    }catch(error){
+      showError(error.message || "Unable to read the pasted report.")
+    }
+  }
+}
+
+function importClipboardText(text){
+  if(!text.trim()) throw new Error("The clipboard does not contain report data.")
+  setImportProgress(35,"Parsing pasted report...")
+  let wb=XLSX.read(text,{type:"string"})
+  importWorkbook(wb,"Pasted from clipboard")
+}
+
+function importWorkbook(wb,name){
+  if(!wb?.SheetNames?.length) throw new Error("The report does not contain a readable sheet.")
+
+  let match
+  let best={count:0,headers:[]}
+
+  for(let sheetName of wb.SheetNames){
+    let sheet=wb.Sheets[sheetName]
+    if(!sheet) continue
+    repairSheetRange(sheet)
+
+    let matrix=XLSX.utils.sheet_to_json(sheet,{header:1,defval:"",raw:false})
+    let scanLimit=Math.min(matrix.length,30)
+
+    for(let rowIndex=0;rowIndex<scanLimit;rowIndex++){
+      let headers=matrix[rowIndex].map(value=>canonicalColumnName(normalize(value)))
+      let count=REQUIRED_COLUMNS.filter(column=>headers.includes(column)).length
+      if(count>best.count) best={count,headers}
+      if(count===REQUIRED_COLUMNS.length){
+        match={sheet,rowIndex,sheetName}
+        break
+      }
+    }
+    if(match) break
+  }
+
+  if(!match){
+    let missing=REQUIRED_COLUMNS.filter(column=>!best.headers.includes(column))
+    throw new Error(`Could not locate the report header. Missing: ${missing.join(", ")}`)
+  }
+
+  let rows=XLSX.utils.sheet_to_json(match.sheet,{
+    defval:"",
+    range:match.rowIndex,
+    raw:false
+  }).map(normalizeRowKeys)
+
+  rows=rows.filter(row=>Object.values(row).some(value=>normalize(value)))
+  if(!rows.length) throw new Error("The report does not contain any data rows.")
+
+  setImportProgress(76,"Calculating dashboard...")
+  let report=calculate(rows)
+  prepareDashboard(report,`${name} · ${match.sheetName}`,rows.length)
+}
+
+/* report logic */
+
+function calculate(rows){
+  let dspOrder=buildDspOrder(rows)
+  let shipments=Object.fromEntries(dspOrder.map(d=>[d,new Map()]))
+  let unmatchedRows=0
+  let emptyWaybillRows=0
+  let duplicateRows=0
+
+  rows.forEach(r=>{
+    let dspRaw=normalize(r["派送方"]).replace(/\s/g,"")
+    let dsp=findDsp(dspRaw,dspOrder)
+    if(!dsp){
+      unmatchedRows++
+      return
+    }
+
+    let waybill=normalize(r["运单号"])
+    if(!waybill){
+      emptyWaybillRows++
+      return
+    }
+
+    let status=normalize(r["运单状态"])
+    let receive=normalize(r["领取状态"])
+    let shipment=shipments[dsp].get(waybill)
+
+    if(shipment){
+      duplicateRows++
+    }else{
+      shipment={
+        received:false,
+        abnormalPickup:false,
+        DSP错分:false,
+        上架:false,
+        未拿到:false,
+        HUB滞留:false
+      }
+      shipments[dsp].set(waybill,shipment)
+    }
+
+    if(["签收","派送异常","快递员收件"].includes(status) && receive==="已领"){
+      shipment.received=true
+    }
+    if(["签收","派送异常","快递员收件"].includes(status) && receive==="未领"){
+      shipment.abnormalPickup=true
+    }
+    if(["退回站点","退回转运中心"].includes(status)) shipment.DSP错分=true
+    if(status==="上架") shipment.上架=true
+    if(["转运中心签入","站点签入","转运中心签出"].includes(status)) shipment.未拿到=true
+    if(status==="集包") shipment.HUB滞留=true
+  })
+
+  let data=dspOrder.map(dsp=>{
+    let dspShipments=[...shipments[dsp].values()]
+    let counts={
+      DSP错分:countWhere(dspShipments,"DSP错分"),
+      上架:countWhere(dspShipments,"上架"),
+      未拿到:countWhere(dspShipments,"未拿到"),
+      HUB滞留:countWhere(dspShipments,"HUB滞留")
+    }
+    let received=countWhere(dspShipments,"received")
+    let tags=Object.entries(counts)
+      .filter(([,count])=>count>0)
+      .map(([label,count])=>({label,count}))
+
+    return{
+      派送方:dsp,
+      总数量:dspShipments.length,
+      实领数量:received,
+      未领数量:dspShipments.length-received,
+      异常取件:countWhere(dspShipments,"abnormalPickup"),
+      tags,
+      Comment:tags.map(tag=>`${tag.label}${tag.count}`).join(", ")
+    }
+  })
+
+  return{data,unmatchedRows,emptyWaybillRows,duplicateRows}
+}
+
+function buildDspOrder(rows){
+  let found=new Set()
+
+  rows.forEach(row=>{
+    let dspRaw=normalize(row["派送方"]).replace(/\s/g,"")
+    let dsp=findDsp(dspRaw,KNOWN_DSP)
+    if(dsp) found.add(dsp)
+  })
+
+  return KNOWN_DSP.filter(dsp=>found.has(dsp))
+}
+
+function findDsp(dspRaw,dspList){
+  return dspList.find(dsp=>dspRaw.includes(dsp))
+}
+
+/* render */
+
+let currentData=[]
+let visibleData=[]
+let preparedReport=null
+
+function prepareDashboard(report,name,rowCount){
+  preparedReport={report,name,rowCount}
+  setImportProgress(100,"Upload complete.")
+  let total=sum(report.data,"总数量")
+  let issueCount=report.data.filter(row=>row.异常取件>0 || row.tags.length>0).length
+  readyMeta.textContent=`${rowCount.toLocaleString()} source rows · ${total.toLocaleString()} shipments · ${issueCount.toLocaleString()} DSPs with issues`
+  readyPanel.style.display="block"
+  selectFileButton.textContent="Choose Different File"
+  pasteButton.style.display="none"
+}
+
+function showPreparedDashboard(){
+  if(!preparedReport) return
+  render(preparedReport.report,preparedReport.name,preparedReport.rowCount)
+}
+
+function render(report,name,rowCount){
+  uploadView.style.display="none"
+  dashboard.style.display="block"
+  currentData=report.data
+  visibleData=report.data
+  searchInput.value=""
+  fileInfo.textContent=`${name} · ${rowCount.toLocaleString()} source rows`
+  updateSummary(report.data)
+  updateNotice(report)
+  draw(report.data)
+}
+
+/* table */
+
+function draw(data){
+  visibleData=data
+  thead.replaceChildren()
+  tbody.replaceChildren()
+
+  COLUMNS.forEach(column=>{
+    let th=document.createElement("th")
+    th.textContent=column
+    th.title=`Copy ${column} column`
+    th.tabIndex=0
+    th.addEventListener("click",()=>copyColumn(column,th))
+    th.addEventListener("keydown",e=>{
+      if(e.key==="Enter" || e.key===" ") copyColumn(column,th)
+    })
+    thead.appendChild(th)
+  })
+
+  data.forEach(row=>{
+    let tr=document.createElement("tr")
+    COLUMNS.forEach(column=>{
+      let td=document.createElement("td")
+      if(column==="未领数量" && row[column]>0) td.classList.add("unreceived")
+
+      if(column==="Comment"){
+        let wrapper=document.createElement("div")
+        wrapper.className="commentCell"
+        row.tags.forEach(tag=>{
+          let span=document.createElement("span")
+          span.className=`tag ${TAG_CLASSES[tag.label]}`
+          span.textContent=`${tag.label}${tag.count}`
+          wrapper.appendChild(span)
+        })
+        td.appendChild(wrapper)
+      }else{
+        td.textContent=row[column]
+      }
+      tr.appendChild(td)
+    })
+    tbody.appendChild(tr)
+  })
+}
+
+/* copy column */
+
+async function copyColumn(name,th){
+  let text=visibleData.map(row=>{
+    if(name==="Comment") return row.Comment
+    return row[name] ?? ""
+  }).join("\n")
+
+  try{
+    await navigator.clipboard.writeText(text)
+    let old=name
+    th.innerHTML='Copied <span class="check animate">✓</span>'
+    th.classList.add("copied")
+    setTimeout(()=>{
+      th.textContent=old
+      th.classList.remove("copied")
+    },2000)
+  }catch{
+    th.textContent="Copy failed"
+    setTimeout(()=>{th.textContent=name},2000)
+  }
+}
+
+/* search */
+
+searchInput.addEventListener("input",e=>{
+  let value=e.target.value.trim().toLowerCase()
+  draw(currentData.filter(row=>row["派送方"].toLowerCase().includes(value)))
+})
+
+/* export */
+
+function exportExcel(){
+  let exportData=visibleData.map(row=>Object.fromEntries(
+    COLUMNS.map(column=>[column,row[column]])
+  ))
+  let ws=XLSX.utils.json_to_sheet(exportData)
+  let wb=XLSX.utils.book_new()
+  XLSX.utils.book_append_sheet(wb,ws,"Report")
+  XLSX.writeFile(wb,"DSP_Report.xlsx")
+}
+
+function updateSummary(data){
+  let total=sum(data,"总数量")
+  let received=sum(data,"实领数量")
+  document.getElementById("totalMetric").textContent=total.toLocaleString()
+  document.getElementById("receivedMetric").textContent=received.toLocaleString()
+  document.getElementById("unreceivedMetric").textContent=(total-received).toLocaleString()
+  document.getElementById("issueMetric").textContent=data
+    .filter(row=>row.异常取件>0 || row.tags.length>0).length
+    .toLocaleString()
+}
+
+function updateNotice(report){
+  let messages=[]
+  if(report.duplicateRows) messages.push(`${report.duplicateRows} duplicate source rows were merged by waybill`)
+  if(report.unmatchedRows) messages.push(`${report.unmatchedRows} rows had an unrecognized DSP`)
+  if(report.emptyWaybillRows) messages.push(`${report.emptyWaybillRows} rows had an empty waybill`)
+  notice.textContent=messages.join(" · ")
+  notice.style.display=messages.length ? "block" : "none"
+}
+
+function resetDashboard(){
+  currentData=[]
+  visibleData=[]
+  preparedReport=null
+  fileInput.value=""
+  dashboard.style.display="none"
+  uploadView.style.display="grid"
+  resetImportState()
+}
+
+function normalize(value){
+  return String(value ?? "").replace(/\u00A0/g," ").trim()
+}
+
+function normalizeRowKeys(row){
+  return Object.fromEntries(
+    Object.entries(row).map(([key,value])=>[canonicalColumnName(normalize(key)),value])
+  )
+}
+
+function repairSheetRange(sheet){
+  let range
+
+  Object.keys(sheet).forEach(key=>{
+    if(key[0]==="!") return
+    let cell=XLSX.utils.decode_cell(key)
+    if(!range){
+      range={s:{r:cell.r,c:cell.c},e:{r:cell.r,c:cell.c}}
+      return
+    }
+    range.s.r=Math.min(range.s.r,cell.r)
+    range.s.c=Math.min(range.s.c,cell.c)
+    range.e.r=Math.max(range.e.r,cell.r)
+    range.e.c=Math.max(range.e.c,cell.c)
+  })
+
+  if(range) sheet["!ref"]=XLSX.utils.encode_range(range)
+}
+
+function canonicalColumnName(name){
+  return COLUMN_ALIASES[name] || name
+}
+
+function countWhere(items,key){
+  return items.reduce((total,item)=>total+(item[key] ? 1 : 0),0)
+}
+
+function sum(items,key){
+  return items.reduce((total,item)=>total+item[key],0)
+}
+
+function showError(message){
+  uploadStatus.style.display="none"
+  readyPanel.style.display="none"
+  uploadError.textContent=message
+  uploadError.style.display="block"
+}
+
+function clearError(){
+  uploadError.textContent=""
+  uploadError.style.display="none"
+}
+
+function setImportProgress(percent,message){
+  uploadStatus.style.display="block"
+  statusBar.style.width=`${percent}%`
+  statusText.textContent=message
+}
+
+function resetImportState(){
+  clearError()
+  preparedReport=null
+  uploadStatus.style.display="none"
+  statusBar.style.width="0%"
+  statusText.textContent="Preparing report..."
+  readyPanel.style.display="none"
+  pasteButton.style.display="inline-block"
+  selectFileButton.textContent="Select File"
+}
+
+</script>
+
+</body>
+</html>
